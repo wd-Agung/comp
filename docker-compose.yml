@@ -1,19 +1,103 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL:-agung@withdipp.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-comp}
+      POSTGRES_USER: ${POSTGRES_USER:-comp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comp_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-comp} -d ${POSTGRES_DB:-comp}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb --ignore-existing myminio/${MINIO_BUCKET_NAME:-comp-storage};
+      mc mb --ignore-existing myminio/${MINIO_QUESTIONNAIRE_BUCKET:-comp-questionnaires};
+      mc mb --ignore-existing myminio/${MINIO_KNOWLEDGE_BASE_BUCKET:-comp-knowledge-base};
+      mc mb --ignore-existing myminio/${MINIO_ORG_ASSETS_BUCKET:-comp-org-assets};
+      mc anonymous set download myminio/${MINIO_BUCKET_NAME:-comp-storage};
+      mc anonymous set download myminio/${MINIO_QUESTIONNAIRE_BUCKET:-comp-questionnaires};
+      mc anonymous set download myminio/${MINIO_KNOWLEDGE_BASE_BUCKET:-comp-knowledge-base};
+      mc anonymous set download myminio/${MINIO_ORG_ASSETS_BUCKET:-comp-org-assets};
+      exit 0;
+      "
+
   migrator:
     build:
       context: .
       dockerfile: Dockerfile
       target: migrator
     env_file:
-      - packages/db/.env
+      - .env.docker.consolidated
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   seeder:
     build:
       context: .
       dockerfile: Dockerfile
       target: migrator
     env_file:
-      - packages/db/.env
+      - .env.docker.consolidated
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
     command: sh -lc "bunx prisma generate --schema=node_modules/@trycompai/db/dist/schema.prisma && bun packages/db/prisma/seed/seed.js"
+
   app:
     build:
       context: .
@@ -21,16 +105,31 @@ services:
       target: app
       args:
         NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+        NEXT_PUBLIC_PORTAL_URL: ${NEXT_PUBLIC_PORTAL_URL}
     ports:
-      - '3000:3000'
+      - "3000:3000"
     env_file:
-      - apps/app/.env
+      - .env.docker.consolidated
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      traefik:
+        condition: service_started
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/api/health || exit 1']
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
     command: sh -lc "node apps/app/server.js"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`${APP_DOMAIN:-app.localhost}`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
 
   portal:
     build:
@@ -40,11 +139,30 @@ services:
       args:
         NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL_PORTAL}
     ports:
-      - '3002:3000'
+      - "3002:3000"
     env_file:
-      - apps/portal/.env
+      - .env.docker.consolidated
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      traefik:
+        condition: service_started
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3002/ || exit 1']
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portal.rule=Host(`${PORTAL_DOMAIN:-portal.localhost}`)"
+      - "traefik.http.routers.portal.entrypoints=websecure"
+      - "traefik.http.routers.portal.tls.certresolver=letsencrypt"
+      - "traefik.http.services.portal.loadbalancer.server.port=3000"
+
+volumes:
+  postgres_data:
+  minio_data:
+  traefik-certs:

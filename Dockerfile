@@ -13,6 +13,7 @@ COPY packages/kv/package.json ./packages/kv/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/email/package.json ./packages/email/
 COPY packages/integrations/package.json ./packages/integrations/
+COPY packages/integration-platform/package.json ./packages/integration-platform/
 COPY packages/utils/package.json ./packages/utils/
 COPY packages/tsconfig/package.json ./packages/tsconfig/
 COPY packages/analytics/package.json ./packages/analytics/
