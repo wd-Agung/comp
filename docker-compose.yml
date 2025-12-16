@@ -6,7 +6,7 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"
-      - "6937:6937"
+      - "42037:42037"
     environment:
       TRAEFIK_ACME_EMAIL: ${TRAEFIK_ACME_EMAIL}
     volumes:
@@ -19,7 +19,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.postgres.address=:6937"
+      - "--entrypoints.postgres.address=:42037"
       - "--entryPoints.websecure.http.tls=true"
         #- "--entryPoints.web.http.redirections.entryPoint.to=websecure"
         #- "--entryPoints.web.http.redirections.entryPoint.scheme=https"
@@ -37,7 +37,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
-      - "6937:5432"
+      - "42037:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -53,7 +53,7 @@ services:
       - "traefik.enable=true"
       - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.postgres.entrypoints=postgres"
-      - "traefik.tcp.services.postgres.loadbalancer.server.port=6937"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=42037"
 
   minio:
     image: minio/minio:latest
