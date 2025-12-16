@@ -2,6 +2,7 @@ import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 
 const awsConfigSchema = z.object({
+  endpoint: z.string().default('https://s3.us-east-1.amazonaws.com'),
   region: z.string().default('us-east-1'),
   accessKeyId: z.string().min(1, 'AWS_ACCESS_KEY_ID is required'),
   secretAccessKey: z.string().min(1, 'AWS_SECRET_ACCESS_KEY is required'),
@@ -12,6 +13,7 @@ export type AwsConfig = z.infer<typeof awsConfigSchema>;
 
 export const awsConfig = registerAs('aws', (): AwsConfig => {
   const config = {
+    endpoint: process.env.APP_AWS_ENDPOINT || 'https://s3.us-east-1.amazonaws.com',
     region: process.env.APP_AWS_REGION || 'us-east-1',
     accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY || '',

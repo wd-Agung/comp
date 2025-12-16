@@ -35,6 +35,7 @@ export class AttachmentsService {
     }
 
     this.s3Client = new S3Client({
+      endpoint: process.env.APP_AWS_ENDPOINT,
       region: process.env.APP_AWS_REGION || 'us-east-1',
       credentials: {
         accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,

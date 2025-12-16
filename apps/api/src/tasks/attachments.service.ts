@@ -28,6 +28,7 @@ export class AttachmentsService {
     // Safe to access environment variables directly since they're validated
     this.bucketName = process.env.APP_AWS_BUCKET_NAME!;
     this.s3Client = new S3Client({
+      endpoint: process.env.APP_AWS_ENDPOINT || 'https://s3.us-east-1.amazonaws.com',
       region: process.env.APP_AWS_REGION || 'us-east-1',
       credentials: {
         accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,

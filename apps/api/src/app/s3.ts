@@ -4,6 +4,7 @@ import '../config/load-env';
 
 const logger = new Logger('S3');
 
+const APP_AWS_ENDPOINT = process.env.APP_AWS_ENDPOINT;
 const APP_AWS_REGION = process.env.APP_AWS_REGION;
 const APP_AWS_ACCESS_KEY_ID = process.env.APP_AWS_ACCESS_KEY_ID;
 const APP_AWS_SECRET_ACCESS_KEY = process.env.APP_AWS_SECRET_ACCESS_KEY;
@@ -33,6 +34,7 @@ try {
   }
 
   s3ClientInstance = new S3Client({
+    endpoint: APP_AWS_ENDPOINT,
     region: APP_AWS_REGION,
     credentials: {
       accessKeyId: APP_AWS_ACCESS_KEY_ID,

@@ -2,8 +2,6 @@ services:
   traefik:
     image: traefik:v3.6
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     ports:
       - "80:80"
       - "443:443"
@@ -176,7 +174,7 @@ services:
       - "traefik.http.routers.portal.entrypoints=websecure"
       - "traefik.http.routers.portal.tls.certresolver=le"
       - "traefik.http.routers.portal.service=portal"
-      - "traefik.http.services.portal.loadbalancer.server.port=3002"
+      - "traefik.http.services.portal.loadbalancer.server.port=3000"
 
 volumes:
   postgres_data:

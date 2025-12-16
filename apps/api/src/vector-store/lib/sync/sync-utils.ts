@@ -1,10 +1,10 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { extractContentFromFile } from '@/trigger/vector-store/helpers/extract-content-from-file';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { logger } from '../../logger';
 import { vectorIndex } from '../core/client';
+import type { ExistingEmbedding } from '../core/find-existing-embeddings';
 import { batchUpsertEmbeddings } from '../core/upsert-embedding';
 import { chunkText } from '../utils/chunk-text';
-import { logger } from '../../logger';
-import type { ExistingEmbedding } from '../core/find-existing-embeddings';
 
 export type SourceType =
   | 'policy'
@@ -37,6 +37,7 @@ export interface ChunkItem {
  * Creates an S3 client instance for Knowledge Base document processing
  */
 export function createKnowledgeBaseS3Client(): S3Client {
+  const endpoint = process.env.APP_AWS_ENDPOINT || 'https://s3.us-east-1.amazonaws.com';
   const region = process.env.APP_AWS_REGION || 'us-east-1';
   const accessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
@@ -48,6 +49,7 @@ export function createKnowledgeBaseS3Client(): S3Client {
   }
 
   return new S3Client({
+    endpoint,
     region,
     credentials: {
       accessKeyId,

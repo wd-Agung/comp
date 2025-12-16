@@ -1,16 +1,17 @@
-import { logger, task } from '@trigger.dev/sdk';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { db } from '@db';
+import { vectorIndex } from '@/vector-store/lib/core/client';
+import { findEmbeddingsForSource } from '@/vector-store/lib/core/find-existing-embeddings';
 import { batchUpsertEmbeddings } from '@/vector-store/lib/core/upsert-embedding';
 import { chunkText } from '@/vector-store/lib/utils/chunk-text';
-import { findEmbeddingsForSource } from '@/vector-store/lib/core/find-existing-embeddings';
-import { vectorIndex } from '@/vector-store/lib/core/client';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { db } from '@db';
+import { logger, task } from '@trigger.dev/sdk';
 import { extractContentFromFile } from './helpers/extract-content-from-file';
 
 /**
  * Creates an S3 client instance for Trigger.dev tasks
  */
 function createS3Client(): S3Client {
+  const endpoint = process.env.APP_AWS_ENDPOINT || 'https://s3.us-east-1.amazonaws.com';
   const region = process.env.APP_AWS_REGION || 'us-east-1';
   const accessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
@@ -22,6 +23,7 @@ function createS3Client(): S3Client {
   }
 
   return new S3Client({
+    endpoint,
     region,
     credentials: {
       accessKeyId,

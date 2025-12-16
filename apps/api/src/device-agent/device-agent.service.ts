@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -15,6 +15,7 @@ export class DeviceAgentService {
     this.fleetBucketName =
       process.env.FLEET_AGENT_BUCKET_NAME || process.env.APP_AWS_BUCKET_NAME!;
     this.s3Client = new S3Client({
+      endpoint: process.env.APP_AWS_ENDPOINT,
       region: process.env.APP_AWS_REGION || 'us-east-1',
       credentials: {
         accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,
