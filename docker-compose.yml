@@ -51,7 +51,7 @@ services:
       - "traefik.enable=true"
       - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.postgres.entrypoints=postgres"
-      - "traefik.tcp.services.postgres.loadbalancer.server.port=42037"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
 
   minio:
     image: minio/minio:latest
