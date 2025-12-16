@@ -1,27 +1,37 @@
-version: "3.8"
-
 services:
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.6
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"
     environment:
       TRAEFIK_ACME_EMAIL: ${TRAEFIK_ACME_EMAIL}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik-certs:/letsencrypt
+      - "./letsencrypt:/letsencrypt"
     command:
+      - "--api.insecure=false"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entryPoints.websecure.http.tls=true"
+        #- "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+        #- "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+        #- "--certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}"
+        #- "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+        #- "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`${DASHBOARD_DOMAIN}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
 
   postgres:
     image: postgres:16-alpine
@@ -106,10 +116,10 @@ services:
       args:
         NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL}
         NEXT_PUBLIC_PORTAL_URL: ${NEXT_PUBLIC_PORTAL_URL}
-    ports:
-      - "3000:3000"
     env_file:
       - .env.docker.consolidated
+    ports:
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,7 +128,11 @@ services:
       traefik:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --spider --quiet http://0.0.0.0:3000/api/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -128,7 +142,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.app.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.app.entrypoints=websecure"
-      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.app.tls.certresolver=le"
+      - "traefik.http.routers.app.service=app"
       - "traefik.http.services.app.loadbalancer.server.port=3000"
 
   portal:
@@ -138,10 +153,10 @@ services:
       target: portal
       args:
         NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL_PORTAL}
-    ports:
-      - "3002:3000"
     env_file:
       - .env.docker.consolidated
+    ports:
+      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,7 +165,7 @@ services:
       traefik:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "wget --spider --quiet http://0.0.0.0:3000 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -159,8 +174,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.portal.rule=Host(`${PORTAL_DOMAIN}`)"
       - "traefik.http.routers.portal.entrypoints=websecure"
-      - "traefik.http.routers.portal.tls.certresolver=letsencrypt"
-      - "traefik.http.services.portal.loadbalancer.server.port=3000"
+      - "traefik.http.routers.portal.tls.certresolver=le"
+      - "traefik.http.routers.portal.service=portal"
+      - "traefik.http.services.portal.loadbalancer.server.port=3002"
 
 volumes:
   postgres_data:
