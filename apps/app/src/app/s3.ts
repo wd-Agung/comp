@@ -25,6 +25,7 @@ try {
       accessKeyId: APP_AWS_ACCESS_KEY_ID,
       secretAccessKey: APP_AWS_SECRET_ACCESS_KEY,
     },
+    forcePathStyle: true,
   });
 } catch (error) {
   console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');

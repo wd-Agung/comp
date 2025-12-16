@@ -29,6 +29,7 @@ function createS3Client(): S3Client {
       accessKeyId,
       secretAccessKey,
     },
+    forcePathStyle: true,
   });
 }
 

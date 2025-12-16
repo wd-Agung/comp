@@ -1,14 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import Browserbase from '@browserbasehq/sdk';
-import { Stagehand } from '@browserbasehq/stagehand';
-import { db } from '@trycompai/db';
-import { z } from 'zod';
 import {
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import Browserbase from '@browserbasehq/sdk';
+import { Stagehand } from '@browserbasehq/stagehand';
+import { Injectable, Logger } from '@nestjs/common';
+import { db } from '@trycompai/db';
+import { z } from 'zod';
 
 const BROWSER_WIDTH = 1440;
 const BROWSER_HEIGHT = 900;
@@ -32,7 +32,9 @@ export class BrowserbaseService {
 
   constructor() {
     this.s3Client = new S3Client({
+      endpoint: process.env.APP_AWS_ENDPOINT,
       region: process.env.AWS_REGION || 'us-east-1',
+      forcePathStyle: true,
     });
     this.bucketName = process.env.APP_AWS_BUCKET_NAME || 'comp-attachments';
   }
