@@ -7,6 +7,10 @@ import { nextCookies } from 'better-auth/next-js';
 import { emailOTP, multiSession, organization } from 'better-auth/plugins';
 import { ac, admin, auditor, contractor, employee, owner } from './permissions';
 
+const trustedOrigins = process.env.AUTH_TRUSTED_ORIGINS
+? process.env.AUTH_TRUSTED_ORIGINS.split(',').map((o) => o.trim())
+: ['http://localhost:3000', 'http://localhost:3002'];
+
 export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: 'postgresql',
@@ -18,7 +22,7 @@ export const auth = betterAuth({
       generateId: false,
     },
   },
-  trustedOrigins: ['http://localhost:3000', 'https://*.trycomp.ai'],
+  trustedOrigins,
   secret: env.AUTH_SECRET!,
   plugins: [
     organization({
