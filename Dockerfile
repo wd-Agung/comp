@@ -21,6 +21,7 @@ COPY packages/analytics/package.json ./packages/analytics/
 # Copy app package.json files
 COPY apps/app/package.json ./apps/app/
 COPY apps/portal/package.json ./apps/portal/
+COPY apps/api/package.json ./apps/api/
 
 # Install all dependencies
 RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true bun install
@@ -153,5 +154,76 @@ COPY --from=portal-builder /app/apps/portal/public ./apps/portal/public
 
 EXPOSE 3000
 CMD ["node", "apps/portal/server.js"]
+
+# =============================================================================
+# STAGE 7: API Builder
+# =============================================================================
+FROM deps AS api-builder
+
+WORKDIR /app
+
+# Copy all source code needed for build
+COPY packages ./packages
+COPY apps/api ./apps/api
+
+# Bring in node_modules for build and prisma prebuild
+COPY --from=deps /app/node_modules ./node_modules
+
+# Pre-combine schemas for API build
+RUN cd packages/db && node scripts/combine-schemas.js
+RUN cp packages/db/dist/schema.prisma apps/api/prisma/schema.prisma
+
+# Build integration-platform package (required by API at runtime)
+RUN cd packages/integration-platform && bun run build
+
+# Reinstall to ensure workspace packages are properly linked with built files
+RUN bun install
+
+ENV NODE_ENV=production
+
+# Build the API
+RUN cd apps/api && bun run build
+
+# =============================================================================
+# STAGE 8: API Production
+# =============================================================================
+FROM node:22-alpine AS api
+
+# Install required packages for healthcheck and Prisma
+RUN apk add --no-cache wget libc6-compat openssl
+
+WORKDIR /app
+
+# Copy built application from builder
+COPY --from=api-builder /app/apps/api/dist ./apps/api/dist
+COPY --from=api-builder /app/apps/api/package.json ./apps/api/
+COPY --from=api-builder /app/apps/api/prisma ./apps/api/prisma
+
+# Copy node_modules (includes built workspace packages like @comp/integration-platform)
+COPY --from=api-builder /app/node_modules ./node_modules
+
+# Copy built integration-platform package to ensure it's available
+COPY --from=api-builder /app/packages/integration-platform/dist ./node_modules/@comp/integration-platform/dist
+COPY --from=api-builder /app/packages/integration-platform/package.json ./node_modules/@comp/integration-platform/package.json
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3333
+
+# Create a non-root user for security
+RUN addgroup --system nestjs && adduser --system --ingroup nestjs nestjs \
+  && chown -R nestjs:nestjs /app
+
+USER nestjs
+
+# Expose the port the app runs on
+EXPOSE 3333
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3333/v1/health || exit 1
+
+# Start the application
+CMD ["node", "apps/api/dist/main.js"]
 
 # (Trigger.dev hosted; no local runner stage)
