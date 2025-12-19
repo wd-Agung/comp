@@ -132,6 +132,7 @@ services:
       - .env.docker.consolidated
     ports:
       - "3000:3000"
+      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,7 +225,107 @@ services:
       - "traefik.http.routers.api.service=api"
       - "traefik.http.services.api.loadbalancer.server.port=3333"
 
+  fleet-mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${FLEET_MYSQL_ROOT_PASSWORD:-fleetroot}
+      MYSQL_DATABASE: ${FLEET_MYSQL_DATABASE:-fleet}
+      MYSQL_USER: ${FLEET_MYSQL_USER:-fleet}
+      MYSQL_PASSWORD: ${FLEET_MYSQL_PASSWORD:-fleet}
+    volumes:
+      - fleet_mysql_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --sql-mode="STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION"
+      --max-allowed-packet=67108864
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${FLEET_MYSQL_ROOT_PASSWORD:-fleetroot}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fleet-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - fleet_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fleet-migrate:
+    image: fleetdm/fleet:v4.61.0
+    restart: on-failure
+    depends_on:
+      fleet-mysql:
+        condition: service_healthy
+    environment:
+      FLEET_MYSQL_ADDRESS: fleet-mysql:3306
+      FLEET_MYSQL_DATABASE: ${FLEET_MYSQL_DATABASE:-fleet}
+      FLEET_MYSQL_USERNAME: ${FLEET_MYSQL_USER:-fleet}
+      FLEET_MYSQL_PASSWORD: ${FLEET_MYSQL_PASSWORD:-fleet}
+    command: fleet prepare db
+
+  fleet:
+    image: fleetdm/fleet:v4.61.0
+    restart: unless-stopped
+    depends_on:
+      fleet-mysql:
+        condition: service_healthy
+      fleet-redis:
+        condition: service_healthy
+      fleet-migrate:
+        condition: service_completed_successfully
+      traefik:
+        condition: service_started
+    environment:
+      FLEET_MYSQL_ADDRESS: fleet-mysql:3306
+      FLEET_MYSQL_DATABASE: ${FLEET_MYSQL_DATABASE:-fleet}
+      FLEET_MYSQL_USERNAME: ${FLEET_MYSQL_USER:-fleet}
+      FLEET_MYSQL_PASSWORD: ${FLEET_MYSQL_PASSWORD:-fleet}
+      FLEET_REDIS_ADDRESS: fleet-redis:6379
+      FLEET_SERVER_ADDRESS: 0.0.0.0:8080
+      FLEET_SERVER_TLS: "false"
+      FLEET_AUTH_BCRYPT_COST: 12
+      FLEET_SESSION_KEY_SIZE: 32
+      FLEET_SESSION_DURATION: 24h
+      FLEET_LOGGING_JSON: "true"
+    ports:
+      - "8081:8080"
+    command: fleet serve
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --spider --quiet http://localhost:8080/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fleet.rule=Host(`${FLEET_DOMAIN}`)"
+      - "traefik.http.routers.fleet.entrypoints=websecure"
+      - "traefik.http.routers.fleet.tls.certresolver=le"
+      - "traefik.http.routers.fleet.service=fleet"
+      - "traefik.http.services.fleet.loadbalancer.server.port=8080"
+
 volumes:
   postgres_data:
   minio_data:
   traefik-certs:
+  fleet_mysql_data:
+  fleet_redis_data:
