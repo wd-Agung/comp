@@ -210,12 +210,6 @@ COPY --from=api-builder /app/packages/integration-platform/package.json ./node_m
 ENV NODE_ENV=production
 ENV PORT=3333
 
-# Create a non-root user for security
-RUN addgroup --system nestjs && adduser --system --ingroup nestjs nestjs \
-  && chown -R nestjs:nestjs /app
-
-USER nestjs
-
 # Expose the port the app runs on
 EXPOSE 3333
 
