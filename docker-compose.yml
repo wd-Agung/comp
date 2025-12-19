@@ -132,7 +132,6 @@ services:
       - .env.docker.consolidated
     ports:
       - "3000:3000"
-      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
