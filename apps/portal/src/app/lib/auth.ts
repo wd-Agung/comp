@@ -35,7 +35,17 @@ export const auth = betterAuth({
 
         const isLocalhost = process.env.NODE_ENV === 'development';
         const protocol = isLocalhost ? 'http' : 'https';
-        const domain = isLocalhost ? 'localhost:3000' : process.env.NEXT_PUBLIC_BETTER_AUTH_URL!;
+        
+        let domain = 'localhost:3000';
+        if (!isLocalhost && process.env.NEXT_PUBLIC_BETTER_AUTH_URL) {
+          try {
+            domain = new URL(process.env.NEXT_PUBLIC_BETTER_AUTH_URL).hostname;
+          } catch (error) {
+            console.error('Error parsing NEXT_PUBLIC_BETTER_AUTH_URL:', error);
+            // Fallback to localhost for development
+          }
+        }
+        
         const inviteLink = `${protocol}://${domain}/invite/${data.invitation.id}`;
 
         const url = `${protocol}://${domain}/auth`;

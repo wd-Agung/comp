@@ -129,14 +129,17 @@ export const auth = betterAuth({
         const protocol = isLocalhost ? 'http' : 'https';
 
         const betterAuthUrl = process.env.NEXT_PUBLIC_BETTER_AUTH_URL;
-        const isDevEnv = betterAuthUrl?.includes('dev.trycomp.ai');
-        const isProdEnv = betterAuthUrl?.includes('app.trycomp.ai');
-
-        const domain = isDevEnv
-          ? 'dev.trycomp.ai'
-          : isProdEnv
-            ? 'app.trycomp.ai'
-            : 'localhost:3000';
+        let domain = 'localhost:3000';
+        
+        if (betterAuthUrl) {
+          try {
+            domain = new URL(betterAuthUrl).hostname;
+          } catch (error) {
+            console.error('Error parsing NEXT_PUBLIC_BETTER_AUTH_URL:', error);
+            // Fallback to localhost for development
+          }
+        }
+        
         const inviteLink = `${protocol}://${domain}/invite/${data.invitation.id}`;
 
         const url = `${protocol}://${domain}/auth`;
