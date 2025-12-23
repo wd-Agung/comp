@@ -22,7 +22,7 @@ export class ApiClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+    this.baseUrl = env.NEXT_PUBLIC_API_URL || 'https://api.comp.withdipp.com';
   }
 
   /**
